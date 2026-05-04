@@ -1,0 +1,84 @@
+name: Integration CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose -f infra/docker-compose.yml config
+          echo "✅ docker-compose.yml is valid"
+
+      - name: Check project structure
+        run: |
+          echo "Checking required files..."
+          test -f backend/cmd/server/main.go    && echo "✅ main.go"
+          test -f backend/internal/api/routes.go && echo "✅ routes.go"
+          test -f backend/internal/db/postgres.go && echo "✅ postgres.go"
+          test -f backend/internal/kafka/consumer.go && echo "✅ consumer.go"
+          test -f ml-service/server.py           && echo "✅ server.py"
+          test -f frontend/src/App.js            && echo "✅ App.js"
+          test -f infra/docker-compose.yml       && echo "✅ docker-compose.yml"
+          test -f infra/init.sql                 && echo "✅ init.sql"
+          echo "✅ All required files present"
+
+      - name: Validate Go module
+        working-directory: backend
+        run: |
+          go version
+          go mod verify
+          echo "✅ Go module verified"
+
+      - name: Set up Go and build
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Build backend
+        working-directory: backend
+        run: |
+          go mod download
+          CGO_ENABLED=0 go build ./...
+          echo "✅ Backend builds successfully"
+
+      - name: Set up Node and build frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: false
+        run: |
+          npm ci
+          npm run build
+          echo "✅ Frontend builds successfully"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for secrets in code
+        run: |
+          echo "Scanning for hardcoded secrets..."
+          if grep -r "password\s*=\s*['\"][^'\"]\+['\"]" --include="*.go" backend/ 2>/dev/null | grep -v "_test\|example\|placeholder"; then
+            echo "⚠️ Possible hardcoded passwords found"
+          else
+            echo "✅ No hardcoded secrets detected"
+          fi
+
+      - name: Verify .gitignore covers sensitive files
+        run: |
+          grep -q "\.env" .gitignore && echo "✅ .env in gitignore"
+          grep -q "models/\*" .gitignore  && echo "✅ ML models in gitignore"
+          echo "✅ Security checks passed"

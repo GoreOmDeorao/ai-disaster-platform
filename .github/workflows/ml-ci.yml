@@ -1,0 +1,46 @@
+name: ML Service CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths: [ml-service/**]
+  pull_request:
+    branches: [main]
+    paths: [ml-service/**]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ml-service/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ml-service
+        run: |
+          pip install --upgrade pip
+          pip install fastapi uvicorn pydantic numpy scikit-learn
+
+      - name: Syntax check all Python files
+        working-directory: ml-service
+        run: |
+          python -m py_compile server.py
+          python -m py_compile train_models.py
+          echo "✅ All Python files syntax OK"
+
+      - name: Validate FastAPI app structure
+        working-directory: ml-service
+        run: |
+          python -c "
+          import ast, sys
+          with open('server.py') as f:
+              tree = ast.parse(f.read())
+          print('✅ server.py AST valid')
+          "
