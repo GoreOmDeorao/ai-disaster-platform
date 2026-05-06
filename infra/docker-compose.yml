@@ -2,6 +2,7 @@ networks:
   disaster-net:
     driver: bridge
 volumes:
+  grafana_data:
   postgres_data:
   redis_data:
 services:
@@ -119,3 +120,35 @@ services:
     volumes:
       - ../ml-service/models:/app/models
     restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: disaster_prometheus
+    networks: [disaster-net]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: disaster_grafana
+    networks: [disaster-net]
+    ports:
+      - "3030:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: disaster123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
