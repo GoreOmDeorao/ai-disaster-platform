@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: disaster-backend
+  namespace: disaster-platform
+  labels:
+    app: disaster-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: disaster-backend
+  template:
+    metadata:
+      labels:
+        app: disaster-backend
+    spec:
+      containers:
+        - name: backend
+          image: 010526266021.dkr.ecr.ap-south-1.amazonaws.com/disaster-backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: redis-url
+            - name: KAFKA_BROKERS
+              value: "kafka-service:9092"
+            - name: PORT
+              value: "8080"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: disaster-platform
+spec:
+  selector:
+    app: disaster-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
