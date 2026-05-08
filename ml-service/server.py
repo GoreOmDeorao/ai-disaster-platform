@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 import numpy as np
 import pandas as pd
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -47,6 +48,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Disaster ML Service", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 
 class PredictRequest(BaseModel):
